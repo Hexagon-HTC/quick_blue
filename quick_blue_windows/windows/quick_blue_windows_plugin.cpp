@@ -89,7 +89,7 @@ struct BluetoothDeviceAgent {
 
   IAsyncOperation<GattDeviceService> GetServiceAsync(std::string service) {
     if (gattServices.count(service) == 0) {
-      auto serviceResult = co_await device.GetGattServicesAsync();
+      auto serviceResult = co_await device.GetGattServicesAsync(BluetoothCacheMode::Uncached);
       if (serviceResult.Status() != GattCommunicationStatus::Success)
         co_return nullptr;
 
@@ -104,7 +104,7 @@ struct BluetoothDeviceAgent {
     if (gattCharacteristics.count(characteristic) == 0) {
       auto gattService = co_await GetServiceAsync(service);
 
-      auto characteristicResult = co_await gattService.GetCharacteristicsAsync();
+      auto characteristicResult = co_await gattService.GetCharacteristicsAsync(BluetoothCacheMode::Uncached);
       if (characteristicResult.Status() != GattCommunicationStatus::Success)
         co_return nullptr;
 
@@ -382,7 +382,7 @@ std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlu
 
 winrt::fire_and_forget QuickBlueWindowsPlugin::ConnectAsync(uint64_t bluetoothAddress) {
   auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(bluetoothAddress);
-  auto servicesResult = co_await device.GetGattServicesAsync();
+  auto servicesResult = co_await device.GetGattServicesAsync(BluetoothCacheMode::Uncached);
   if (servicesResult.Status() != GattCommunicationStatus::Success) {
     OutputDebugString((L"GetGattServicesAsync error: " + winrt::to_hstring((int32_t)servicesResult.Status()) + L"\n").c_str());
     message_connector_->Send(EncodableMap{
@@ -425,7 +425,7 @@ void QuickBlueWindowsPlugin::CleanConnection(uint64_t bluetoothAddress) {
 }
 
 winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(BluetoothDeviceAgent &bluetoothDeviceAgent) {
-  auto serviceResult = co_await bluetoothDeviceAgent.device.GetGattServicesAsync();
+  auto serviceResult = co_await bluetoothDeviceAgent.device.GetGattServicesAsync(BluetoothCacheMode::Uncached);
   if (serviceResult.Status() != GattCommunicationStatus::Success) {
     message_connector_->Send(
       EncodableMap{
@@ -437,7 +437,7 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(BluetoothDe
   }
 
   for (auto s : serviceResult.Services()) {
-    auto characteristicResult = co_await s.GetCharacteristicsAsync();
+    auto characteristicResult = co_await s.GetCharacteristicsAsync(BluetoothCacheMode::Uncached);
     auto msg = EncodableMap{
       {"deviceId", std::to_string(bluetoothDeviceAgent.device.BluetoothAddress())},
       {"ServiceState", "discovered"},
@@ -480,7 +480,7 @@ winrt::fire_and_forget QuickBlueWindowsPlugin::SetNotifiableAsync(BluetoothDevic
 
 winrt::fire_and_forget QuickBlueWindowsPlugin::ReadValueAsync(BluetoothDeviceAgent& bluetoothDeviceAgent, std::string service, std::string characteristic) {
   auto gattCharacteristic = co_await bluetoothDeviceAgent.GetCharacteristicAsync(service, characteristic);
-  auto readValueResult = co_await gattCharacteristic.ReadValueAsync();
+  auto readValueResult = co_await gattCharacteristic.ReadValueAsync(BluetoothCacheMode::Uncached);
   auto bytes = to_bytevc(readValueResult.Value());
   OutputDebugString((L"ReadValueAsync " + winrt::to_hstring(characteristic) + L", " + winrt::to_hstring(to_hexstring(bytes)) + L"\n").c_str());
   message_connector_->Send(EncodableMap{
