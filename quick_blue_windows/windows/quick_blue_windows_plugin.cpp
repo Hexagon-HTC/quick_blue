@@ -225,6 +225,7 @@ void QuickBlueWindowsPlugin::HandleMethodCall(
   } else if (method_name.compare("startScan") == 0) {
     if (!bluetoothLEWatcher) {
       bluetoothLEWatcher = BluetoothLEAdvertisementWatcher();
+      bluetoothLEWatcher.ScanningMode(BluetoothLEScanningMode::Active);
       bluetoothLEWatcherReceivedToken = bluetoothLEWatcher.Received({ this, &QuickBlueWindowsPlugin::BluetoothLEWatcher_Received });
     }
     bluetoothLEWatcher.Start();
