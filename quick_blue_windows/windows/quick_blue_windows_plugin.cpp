@@ -327,11 +327,6 @@ std::vector<uint8_t> parseManufacturerDataHead(BluetoothLEAdvertisement advertis
     uint16_t_union companyId;
     companyId.uint16 = manufacturerData.CompanyId();
 
-#ifdef REG_DWORD_BIG_ENDIAN
-    // Swap bytes for big-endian if necessary
-    std::swap(companyId.bytes[0], companyId.bytes[1]);
-#endif
-
     auto result = std::vector<uint8_t>(companyId.bytes, companyId.bytes + sizeof(uint16_t_union));
 
     auto data = to_bytevc(manufacturerData.Data());
