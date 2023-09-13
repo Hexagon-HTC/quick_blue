@@ -319,17 +319,24 @@ void QuickBlueWindowsPlugin::HandleMethodCall(
 
 std::vector<uint8_t> parseManufacturerDataHead(BluetoothLEAdvertisement advertisement)
 {
-  if (advertisement.ManufacturerData().Size() == 0)
-    return std::vector<uint8_t>();
+    if (advertisement.ManufacturerData().Size() == 0)
+        return std::vector<uint8_t>();
 
-  auto manufacturerData = advertisement.ManufacturerData().GetAt(0);
-  // FIXME Compat with REG_DWORD_BIG_ENDIAN
-  uint8_t* prefix = uint16_t_union{ manufacturerData.CompanyId() }.bytes;
-  auto result = std::vector<uint8_t>{ prefix, prefix + sizeof(uint16_t_union) };
+    auto manufacturerData = advertisement.ManufacturerData().GetAt(0);
 
-  auto data = to_bytevc(manufacturerData.Data());
-  result.insert(result.end(), data.begin(), data.end());
-  return result;
+    uint16_t_union companyId;
+    companyId.uint16 = manufacturerData.CompanyId();
+
+#ifdef REG_DWORD_BIG_ENDIAN
+    // Swap bytes for big-endian if necessary
+    std::swap(companyId.bytes[0], companyId.bytes[1]);
+#endif
+
+    auto result = std::vector<uint8_t>(companyId.bytes, companyId.bytes + sizeof(uint16_t_union));
+
+    auto data = to_bytevc(manufacturerData.Data());
+    result.insert(result.end(), data.begin(), data.end());
+    return result;
 }
 
 void QuickBlueWindowsPlugin::BluetoothLEWatcher_Received(
