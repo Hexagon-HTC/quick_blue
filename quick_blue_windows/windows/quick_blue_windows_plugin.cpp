@@ -231,8 +231,21 @@ namespace
   winrt::fire_and_forget QuickBlueWindowsPlugin::InitializeAsync()
   {
     try {
-      auto bluetoothAdapter = co_await BluetoothAdapter::GetDefaultAsync();
-      bluetoothRadio = co_await bluetoothAdapter.GetRadioAsync();
+      bool bluetoothAdapterAvailable = false;
+      auto radios = co_await Radio::GetRadiosAsync();
+      for (Radio radio : radios)
+      {
+        if (radio.Kind() == RadioKind::Bluetooth)
+        {
+          bluetoothAdapterAvailable = true;
+        }
+      }
+ 
+      if (bluetoothAdapterAvailable)
+      {
+        auto adapter = co_await BluetoothAdapter::GetDefaultAsync();
+        bluetoothRadio = co_await adapter.GetRadioAsync();
+      }
     } 
     catch (...) {
       OutputDebugString((L"Exception on InitializeAsync"));
