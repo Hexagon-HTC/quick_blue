@@ -230,145 +230,169 @@ namespace
 
   winrt::fire_and_forget QuickBlueWindowsPlugin::InitializeAsync()
   {
-    auto bluetoothAdapter = co_await BluetoothAdapter::GetDefaultAsync();
-    bluetoothRadio = co_await bluetoothAdapter.GetRadioAsync();
+    try {
+      bool bluetoothAdapterAvailable = false;
+      auto radios = co_await Radio::GetRadiosAsync();
+      for (Radio radio : radios)
+      {
+        if (radio.Kind() == RadioKind::Bluetooth)
+        {
+          bluetoothAdapterAvailable = true;
+        }
+      }
+ 
+      if (bluetoothAdapterAvailable)
+      {
+        auto adapter = co_await BluetoothAdapter::GetDefaultAsync();
+        bluetoothRadio = co_await adapter.GetRadioAsync();
+      }
+    } 
+    catch (...) {
+      OutputDebugString((L"Exception on InitializeAsync"));
+    }
   }
 
   void QuickBlueWindowsPlugin::HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
       std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result)
   {
-    auto method_name = method_call.method_name();
-    OutputDebugString((L"HandleMethodCall " + winrt::to_hstring(method_name) + L"\n").c_str());
-    if (method_name.compare("isBluetoothAvailable") == 0)
-    {
-      result->Success(EncodableValue(bluetoothRadio && bluetoothRadio.State() == RadioState::On));
-    }
-    else if (method_name.compare("startScan") == 0)
-    {
-      if (!bluetoothLEWatcher)
+    try {
+      auto method_name = method_call.method_name();
+      OutputDebugString((L"HandleMethodCall " + winrt::to_hstring(method_name) + L"\n").c_str());
+      if (method_name.compare("isBluetoothAvailable") == 0)
       {
-        bluetoothLEWatcher = BluetoothLEAdvertisementWatcher();
-        bluetoothLEWatcher.ScanningMode(BluetoothLEScanningMode::Active);
-        bluetoothLEWatcherReceivedToken = bluetoothLEWatcher.Received({this, &QuickBlueWindowsPlugin::BluetoothLEWatcher_Received});
+        result->Success(EncodableValue(bluetoothRadio && bluetoothRadio.State() == RadioState::On));
       }
-      bluetoothLEWatcher.Start();
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("stopScan") == 0)
-    {
-      if (bluetoothLEWatcher)
+      else if (method_name.compare("startScan") == 0)
       {
-        bluetoothLEWatcher.Stop();
-        bluetoothLEWatcher.Received(bluetoothLEWatcherReceivedToken);
+        if (!bluetoothLEWatcher)
+        {
+          bluetoothLEWatcher = BluetoothLEAdvertisementWatcher();
+          bluetoothLEWatcher.ScanningMode(BluetoothLEScanningMode::Active);
+          bluetoothLEWatcherReceivedToken = bluetoothLEWatcher.Received({this, &QuickBlueWindowsPlugin::BluetoothLEWatcher_Received});
+        }
+        bluetoothLEWatcher.Start();
+        result->Success(nullptr);
       }
-      bluetoothLEWatcher = nullptr;
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("connect") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      ConnectAsync(std::stoull(deviceId));
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("disconnect") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      CleanConnection(std::stoull(deviceId));
-      // TODO send `disconnected` message
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("discoverServices") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      auto it = connectedDevices.find(std::stoull(deviceId));
-      if (it == connectedDevices.end())
+      else if (method_name.compare("stopScan") == 0)
       {
-        result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
-        return;
+        if (bluetoothLEWatcher)
+        {
+          bluetoothLEWatcher.Stop();
+          bluetoothLEWatcher.Received(bluetoothLEWatcherReceivedToken);
+        }
+        bluetoothLEWatcher = nullptr;
+        result->Success(nullptr);
       }
-      DiscoverServicesAsync(*it->second);
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("setNotifiable") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      auto service = std::get<std::string>(args[EncodableValue("service")]);
-      auto characteristic = std::get<std::string>(args[EncodableValue("characteristic")]);
-      auto bleInputProperty = std::get<std::string>(args[EncodableValue("bleInputProperty")]);
-      auto it = connectedDevices.find(std::stoull(deviceId));
-      if (it == connectedDevices.end())
+      else if (method_name.compare("connect") == 0)
       {
-        result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
-        return;
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        ConnectAsync(std::stoull(deviceId));
+        result->Success(nullptr);
       }
+      else if (method_name.compare("disconnect") == 0)
+      {
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        CleanConnection(std::stoull(deviceId));
+        // TODO send `disconnected` message
+        result->Success(nullptr);
+      }
+      else if (method_name.compare("discoverServices") == 0)
+      {
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        auto it = connectedDevices.find(std::stoull(deviceId));
+        if (it == connectedDevices.end())
+        {
+          result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
+          return;
+        }
+        DiscoverServicesAsync(*it->second);
+        result->Success(nullptr);
+      }
+      else if (method_name.compare("setNotifiable") == 0)
+      {
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        auto service = std::get<std::string>(args[EncodableValue("service")]);
+        auto characteristic = std::get<std::string>(args[EncodableValue("characteristic")]);
+        auto bleInputProperty = std::get<std::string>(args[EncodableValue("bleInputProperty")]);
+        auto it = connectedDevices.find(std::stoull(deviceId));
+        if (it == connectedDevices.end())
+        {
+          result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
+          return;
+        }
 
-      SetNotifiableAsync(*it->second, service, characteristic, bleInputProperty);
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("requestMtu") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      auto expectedMtu = std::get<int32_t>(args[EncodableValue("expectedMtu")]);
-      auto it = connectedDevices.find(std::stoull(deviceId));
-      if (it == connectedDevices.end())
-      {
-        result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
-        return;
+        SetNotifiableAsync(*it->second, service, characteristic, bleInputProperty);
+        result->Success(nullptr);
       }
-
-      RequestMtuAsync(*it->second, expectedMtu);
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("readValue") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      auto service = std::get<std::string>(args[EncodableValue("service")]);
-      auto characteristic = std::get<std::string>(args[EncodableValue("characteristic")]);
-      auto it = connectedDevices.find(std::stoull(deviceId));
-      if (it == connectedDevices.end())
+      else if (method_name.compare("requestMtu") == 0)
       {
-        result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
-        return;
-      }
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        auto expectedMtu = std::get<int32_t>(args[EncodableValue("expectedMtu")]);
+        auto it = connectedDevices.find(std::stoull(deviceId));
+        if (it == connectedDevices.end())
+        {
+          result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
+          return;
+        }
 
-      ReadValueAsync(*it->second, service, characteristic);
-      result->Success(nullptr);
-    }
-    else if (method_name.compare("writeValue") == 0)
-    {
-      auto args = std::get<EncodableMap>(*method_call.arguments());
-      auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
-      auto service = std::get<std::string>(args[EncodableValue("service")]);
-      auto characteristic = std::get<std::string>(args[EncodableValue("characteristic")]);
-      auto value = std::get<std::vector<uint8_t>>(args[EncodableValue("value")]);
-      auto bleOutputProperty = std::get<std::string>(args[EncodableValue("bleOutputProperty")]);
-      auto it = connectedDevices.find(std::stoull(deviceId));
-      if (it == connectedDevices.end())
+        RequestMtuAsync(*it->second, expectedMtu);
+        result->Success(nullptr);
+      }
+      else if (method_name.compare("readValue") == 0)
       {
-        result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
-        return;
-      }
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        auto service = std::get<std::string>(args[EncodableValue("service")]);
+        auto characteristic = std::get<std::string>(args[EncodableValue("characteristic")]);
+        auto it = connectedDevices.find(std::stoull(deviceId));
+        if (it == connectedDevices.end())
+        {
+          result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
+          return;
+        }
 
-      WriteValueAsync(*it->second, service, characteristic, value, bleOutputProperty);
-      result->Success(nullptr);
+        ReadValueAsync(*it->second, service, characteristic);
+        result->Success(nullptr);
+      }
+      else if (method_name.compare("writeValue") == 0)
+      {
+        auto args = std::get<EncodableMap>(*method_call.arguments());
+        auto deviceId = std::get<std::string>(args[EncodableValue("deviceId")]);
+        auto service = std::get<std::string>(args[EncodableValue("service")]);
+        auto characteristic = std::get<std::string>(args[EncodableValue("characteristic")]);
+        auto value = std::get<std::vector<uint8_t>>(args[EncodableValue("value")]);
+        auto bleOutputProperty = std::get<std::string>(args[EncodableValue("bleOutputProperty")]);
+        auto it = connectedDevices.find(std::stoull(deviceId));
+        if (it == connectedDevices.end())
+        {
+          result->Error("IllegalArgument", "Unknown devicesId:" + deviceId);
+          return;
+        }
+
+        WriteValueAsync(*it->second, service, characteristic, value, bleOutputProperty);
+        result->Success(nullptr);
+      }
+      else
+      {
+        result->NotImplemented();
+      }
     }
-    else
-    {
-      result->NotImplemented();
+    catch (...) {
+      OutputDebugString((L"Exception on HandleMethodCall"));
     }
+    
   }
 
   std::vector<uint8_t> parseManufacturerDataHead(BluetoothLEAdvertisement advertisement)
   {
     if (advertisement.ManufacturerData().Size() == 0)
-      return std::vector<uint8_t>();
+    return std::vector<uint8_t>();
 
     auto manufacturerData = advertisement.ManufacturerData().GetAt(0);
 
@@ -380,61 +404,85 @@ namespace
     auto data = to_bytevc(manufacturerData.Data());
     result.insert(result.end(), data.begin(), data.end());
     return result;
+    
   }
 
   void QuickBlueWindowsPlugin::BluetoothLEWatcher_Received(
       BluetoothLEAdvertisementWatcher sender,
       BluetoothLEAdvertisementReceivedEventArgs args)
   {
-    SendScanResultAsync(args);
+    try {
+      SendScanResultAsync(args);
+    }
+    catch (...) {
+      OutputDebugString((L"Exception on BluetoothLEWatcher_Received"));
+    }
   }
 
   winrt::fire_and_forget QuickBlueWindowsPlugin::SendScanResultAsync(BluetoothLEAdvertisementReceivedEventArgs args)
   {
-    auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(args.BluetoothAddress());
-    auto name = device ? device.Name() : args.Advertisement().LocalName();
-    OutputDebugString((L"Received BluetoothAddress:" + winrt::to_hstring(args.BluetoothAddress()) + L", Name:" + name + L", LocalName:" + args.Advertisement().LocalName() + L"\n").c_str());
-    if (scan_result_sink_)
-    {
-      scan_result_sink_->Success(EncodableMap{
-          {"name", winrt::to_string(name)},
-          {"deviceId", std::to_string(args.BluetoothAddress())},
-          {"manufacturerDataHead", parseManufacturerDataHead(args.Advertisement())},
-          {"rssi", args.RawSignalStrengthInDBm()},
-      });
+    try {
+      auto device = co_await BluetoothLEDevice::FromBluetoothAddressAsync(args.BluetoothAddress());
+      auto name = device ? device.Name() : args.Advertisement().LocalName();
+      OutputDebugString((L"Received BluetoothAddress:" + winrt::to_hstring(args.BluetoothAddress()) + L", Name:" + name + L", LocalName:" + args.Advertisement().LocalName() + L"\n").c_str());
+      if (scan_result_sink_)
+      {
+        scan_result_sink_->Success(EncodableMap{
+            {"name", winrt::to_string(name)},
+            {"deviceId", std::to_string(args.BluetoothAddress())},
+            {"manufacturerDataHead", parseManufacturerDataHead(args.Advertisement())},
+            {"rssi", args.RawSignalStrengthInDBm()},
+        });
+      }
     }
+    catch (...) {
+      OutputDebugString((L"Exception on SendScanResultAsync"));
+    }
+    
   }
 
   std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlugin::OnListenInternal(
       const EncodableValue *arguments, std::unique_ptr<flutter::EventSink<EncodableValue>> &&events)
   {
-    if (arguments == nullptr)
-    {
-      return nullptr;
+    try {
+      if (arguments == nullptr)
+      {
+        return nullptr;
+      }
+      auto args = std::get<EncodableMap>(*arguments);
+      auto name = std::get<std::string>(args[EncodableValue("name")]);
+      if (name.compare("scanResult") == 0)
+      {
+        scan_result_sink_ = std::move(events);
+      }
+    } 
+    catch (...) {
+      OutputDebugString((L"Exception on OnListenInternal"));
     }
-    auto args = std::get<EncodableMap>(*arguments);
-    auto name = std::get<std::string>(args[EncodableValue("name")]);
-    if (name.compare("scanResult") == 0)
-    {
-      scan_result_sink_ = std::move(events);
-    }
+
     return nullptr;
   }
 
   std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlugin::OnCancelInternal(
       const EncodableValue *arguments)
   {
-    if (arguments == nullptr)
-    {
-      return nullptr;
+    try {
+      if (arguments == nullptr)
+      {
+        return nullptr;
+      }
+      auto args = std::get<EncodableMap>(*arguments);
+      auto name = std::get<std::string>(args[EncodableValue("name")]);
+      if (name.compare("scanResult") == 0)
+      {
+        scan_result_sink_ = nullptr;
+      }
     }
-    auto args = std::get<EncodableMap>(*arguments);
-    auto name = std::get<std::string>(args[EncodableValue("name")]);
-    if (name.compare("scanResult") == 0)
-    {
-      scan_result_sink_ = nullptr;
+    catch (...) {
+      OutputDebugString((L"Exception on OnCancelInternal"));
     }
     return nullptr;
+    
   }
 
   winrt::fire_and_forget QuickBlueWindowsPlugin::ConnectAsync(uint64_t bluetoothAddress)
@@ -490,16 +538,22 @@ namespace
 
   void QuickBlueWindowsPlugin::CleanConnection(uint64_t bluetoothAddress)
   {
-    auto node = connectedDevices.extract(bluetoothAddress);
-    if (!node.empty())
-    {
-      auto deviceAgent = std::move(node.mapped());
-      deviceAgent->device.ConnectionStatusChanged(deviceAgent->connnectionStatusChangedToken);
-      for (auto &tokenPair : deviceAgent->valueChangedTokens)
+    try {
+      auto node = connectedDevices.extract(bluetoothAddress);
+      if (!node.empty())
       {
-        deviceAgent->gattCharacteristics.at(tokenPair.first).ValueChanged(tokenPair.second);
+        auto deviceAgent = std::move(node.mapped());
+        deviceAgent->device.ConnectionStatusChanged(deviceAgent->connnectionStatusChangedToken);
+        for (auto &tokenPair : deviceAgent->valueChangedTokens)
+        {
+          deviceAgent->gattCharacteristics.at(tokenPair.first).ValueChanged(tokenPair.second);
+        }
       }
+    } 
+    catch (...) {
+      OutputDebugString((L"Exception on CleanConnection"));
     }
+    
   }
 
   winrt::fire_and_forget QuickBlueWindowsPlugin::DiscoverServicesAsync(BluetoothDeviceAgent &bluetoothDeviceAgent)
