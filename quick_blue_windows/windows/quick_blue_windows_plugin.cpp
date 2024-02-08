@@ -391,24 +391,19 @@ namespace
 
   std::vector<uint8_t> parseManufacturerDataHead(BluetoothLEAdvertisement advertisement)
   {
-    try {
-      if (advertisement.ManufacturerData().Size() == 0)
-      return std::vector<uint8_t>();
+    if (advertisement.ManufacturerData().Size() == 0)
+    return std::vector<uint8_t>();
 
-      auto manufacturerData = advertisement.ManufacturerData().GetAt(0);
+    auto manufacturerData = advertisement.ManufacturerData().GetAt(0);
 
-      uint16_t_union companyId;
-      companyId.uint16 = manufacturerData.CompanyId();
+    uint16_t_union companyId;
+    companyId.uint16 = manufacturerData.CompanyId();
 
-      auto result = std::vector<uint8_t>(companyId.bytes, companyId.bytes + sizeof(uint16_t_union));
+    auto result = std::vector<uint8_t>(companyId.bytes, companyId.bytes + sizeof(uint16_t_union));
 
-      auto data = to_bytevc(manufacturerData.Data());
-      result.insert(result.end(), data.begin(), data.end());
-      return result;
-    }
-    catch (...) {
-      OutputDebugString((L"Exception on parseManufacturerDataHead"));
-    }
+    auto data = to_bytevc(manufacturerData.Data());
+    result.insert(result.end(), data.begin(), data.end());
+    return result;
     
   }
 
