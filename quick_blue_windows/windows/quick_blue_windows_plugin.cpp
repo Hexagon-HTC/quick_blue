@@ -460,12 +460,12 @@ namespace
       {
         scan_result_sink_ = std::move(events);
       }
-      return nullptr;
     } 
     catch (...) {
       OutputDebugString((L"Exception on OnListenInternal"));
     }
-    
+
+    return nullptr;
   }
 
   std::unique_ptr<flutter::StreamHandlerError<EncodableValue>> QuickBlueWindowsPlugin::OnCancelInternal(
@@ -482,11 +482,11 @@ namespace
       {
         scan_result_sink_ = nullptr;
       }
-      return nullptr;
     }
     catch (...) {
       OutputDebugString((L"Exception on OnCancelInternal"));
     }
+    return nullptr;
     
   }
 
